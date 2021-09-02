@@ -1,0 +1,122 @@
+import os
+
+cross_compiler = "arm-none-eabi-"
+mcuboot_root = "/mnt/d/Marcelo/bitbucket/mcuboot/mcuboot/"
+all_incs = [
+    os.path.join(mcuboot_root,'ext/mbedtls/include'),
+    os.path.join(mcuboot_root,'boot/stm32/blackpill'),
+    os.path.join(mcuboot_root,'boot/bootutil/include'),
+    os.path.join(mcuboot_root,'boot/bootutil')]
+
+tools = [
+    ('AR','ar'),
+    ('AS','as'),
+    ('CC','gcc'),
+    ('CXX','g++'),
+    ('LD','g++'),
+    ('LINK','gcc'),
+    ('STRIP','strip'),
+    ('RANLIB','ranlib'),
+    ('OBJCOPY','objcopy'),
+    ('OBJDUMP','objdump')
+]
+
+cflags = [
+    '-mthumb',
+    '-nostdlib',
+    '-nostartfiles',
+    '-Wall',
+    '-fdata-sections',
+    '-ffunction-sections',
+    '-g',
+    '-pedantic',
+    '-std=c11',
+    '-fstack-usage',
+    '-specs=nano.specs',
+    '-I.',
+]
+
+ldflags = [
+    '-mthumb',
+    '-specs=nano.specs',
+    '-static',
+    '-u _printf_float',
+    '-Wl,-Map=elfapp.map,--cref',
+    '-Wl,--gc-sections',
+    '-Tlinker.ld',
+    '-Wall'
+]
+
+cflags = ['-mcpu=cortex-m4',
+          '-mfpu=fpv4-sp-d16',
+          '-mfloat-abi=hard',
+]
+
+ldflags = [
+    '-mcpu=cortex-m4',
+    '-mfpu=fpv4-sp-d16',
+    '-mfloat-abi=hard',
+]
+env = Environment(
+    CCFLAGS = cflags,
+    LINKFLAGS = ldflags,
+    CPPPATH = all_incs,
+)
+
+for (tool, name) in tools:
+    env[tool] = cross_compiler + name
+
+env['ENV']['TERM'] = os.environ['TERM']
+
+objd_flags = [] 
+srcs = { 
+    'boot/bootutil/src': [ 
+        'boot_record.c',
+        'bootutil_misc.c',
+        'bootutil_public.c',
+        'caps.c',
+        'encrypted.c',
+        'fault_injection_hardening.c',
+        'fault_injection_hardening_delay_rng_mbedtls.c',
+        'image_ec.c',
+        'image_ec256.c',
+        'image_ed25519.c',
+        'image_rsa.c',
+        'image_validate.c',
+        'loader.c',
+        'swap_misc.c',
+        'swap_move.c',
+        'swap_scratch.c',
+        'tlv.c'
+        ],
+    'boot/stm32/blackpill': [
+        'mcuboot_main.c'
+        ]
+    }
+
+all_srcs = []
+for pdir,files in srcs.items():
+    for f in files:
+        all_srcs.append(os.path.join(mcuboot_root,pdir,f))
+
+print("SOURCES:")
+print(all_srcs)
+
+print("INCLUDE:")
+print(all_incs)
+def arm_generator(source, target, env, for_signature):
+    return '$OBJDUMP -S -D -marm  %s > %s' % (source[0],target[0])
+
+# env.Append(BUILDERS = {
+#     'Objdump': Builder(
+#         generator=arm_generator,
+#         suffix='.asm'
+#     )
+# })
+
+#for app_name,app_src in srcs.items():
+#    s = fixed_srcs + [ os.path.join(srcs_dir,f) for f in app_src ]
+prg = env.Program(target='mcuboot_stm32',source=all_srcs)
+#env.Objdump(prg)
+
+
