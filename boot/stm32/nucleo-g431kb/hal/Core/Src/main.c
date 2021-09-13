@@ -89,7 +89,8 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  extern void mcuboot_main(void);
+  mcuboot_main();
   /* USER CODE END 2 */
 
   /* Infinite loop */

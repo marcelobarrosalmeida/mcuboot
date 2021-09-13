@@ -26,7 +26,8 @@ tools = [
     ('STRIP','strip'),
     ('RANLIB','ranlib'),
     ('OBJCOPY','objcopy'),
-    ('OBJDUMP','objdump')
+    ('OBJDUMP','objdump'),
+    ('SIZE','size'),
 ]
 
 DEFS = [    
@@ -49,9 +50,9 @@ cflags = [
     '-g',
     '-pedantic',
     '-std=c11',
-    '-fstack-usage',
     '-specs=nano.specs',
     '-I.',
+#    '-fstack-usage',
 ]
 
 ldflags = [
@@ -160,9 +161,19 @@ def arm_generator(source, target, env, for_signature):
 #     )
 # })
 
+def arm_size(source, target, env, for_signature):
+    return '$SIZE -d {}'.format(source[0])
+
+env.Append(BUILDERS = {
+    'Size': Builder(
+        generator=arm_size,
+#        suffix='.asm'
+    )
+})
+
 #for app_name,app_src in srcs.items():
 #    s = fixed_srcs + [ os.path.join(srcs_dir,f) for f in app_src ]
 prg = env.Program(target=TARGET+'.elf',source=all_srcs)
-#env.Objdump(prg)
+env.Size(prg)
 
 
