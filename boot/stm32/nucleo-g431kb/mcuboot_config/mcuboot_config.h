@@ -93,11 +93,13 @@
 
 /* Default maximum number of flash sectors per image slot; change
  * as desirable. */
-#define MCUBOOT_MAX_IMG_SECTORS 32
+#define MCUBOOT_MAX_IMG_SECTORS 24
+
 /*
-Sector 5: 0x08040000 128kB
-Sector 6: 0x08020000 128kB
-Sector 7: 0x08060000 128kB
+NUCLEO-G431KB: STM32G431KB 128kB, single bank, 2kB per sector
+32kB: 0x08000000-0x08007FFF  bootloader
+48kB: 0x08008000-0x08013FFF  first image
+48kB: 0x08014000-0x0801FFFF  second image
 */
 
 /* Default number of separately updateable images; change in case of

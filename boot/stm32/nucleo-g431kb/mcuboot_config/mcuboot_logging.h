@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <stdio.h>
 //extern int printf(const char *fmt, ...);
 
 #define MCUBOOT_LOG_LEVEL_OFF      0

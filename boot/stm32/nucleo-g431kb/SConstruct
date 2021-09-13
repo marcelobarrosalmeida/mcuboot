@@ -2,15 +2,23 @@ import os
 
 cross_compiler = "arm-none-eabi-"
 mcuboot_root = "/mnt/d/Marcelo/bitbucket/mcuboot/mcuboot/"
+TARGET='mcuboot_firmware'
+
 all_incs = [
     os.path.join(mcuboot_root,'ext/mbedtls/include'),
-    os.path.join(mcuboot_root,'boot/stm32/blackpill'),
+    os.path.join(mcuboot_root,'boot/stm32/nucleo-g431kb'),
     os.path.join(mcuboot_root,'boot/bootutil/include'),
-    os.path.join(mcuboot_root,'boot/bootutil')]
+    os.path.join(mcuboot_root,'boot/bootutil'),
+    os.path.join(mcuboot_root,'boot/stm32/nucleo-g431kb/hal/Core/Inc'),
+    os.path.join(mcuboot_root,'boot/stm32/nucleo-g431kb/hal/Drivers/STM32G4xx_HAL_Driver/Inc'),
+    os.path.join(mcuboot_root,'boot/stm32/nucleo-g431kb/hal/Drivers/STM32G4xx_HAL_Driver/Inc/Legacy'),
+    os.path.join(mcuboot_root,'boot/stm32/nucleo-g431kb/hal/Drivers/CMSIS/Include'),
+    os.path.join(mcuboot_root,'boot/stm32/nucleo-g431kb/hal/Drivers/CMSIS/Device/ST/STM32G4xx/Include'),
+    ]
 
 tools = [
     ('AR','ar'),
-    ('AS','as'),
+    ('AS','gcc -x assembler-with-cpp'),
     ('CC','gcc'),
     ('CXX','g++'),
     ('LD','g++'),
@@ -21,8 +29,18 @@ tools = [
     ('OBJDUMP','objdump')
 ]
 
+DEFS = [    
+    '-DUSE_HAL_DRIVER',
+    '-DSTM32G431xx',
+]
+LDSCRIPT = os.path.join(mcuboot_root,'boot/stm32/nucleo-g431kb/hal/','STM32G431KBTx_FLASH.ld')
+MAPFILE = os.path.join(mcuboot_root,'boot/stm32/nucleo-g431kb/hal/',TARGET+'.map')
+
 cflags = [
     '-mthumb',
+    '-mcpu=cortex-m4',
+    '-mfpu=fpv4-sp-d16',
+    '-mfloat-abi=hard',
     '-nostdlib',
     '-nostartfiles',
     '-Wall',
@@ -38,27 +56,27 @@ cflags = [
 
 ldflags = [
     '-mthumb',
-    '-specs=nano.specs',
-    '-static',
-    '-u _printf_float',
-    '-Wl,-Map=elfapp.map,--cref',
-    '-Wl,--gc-sections',
-    '-Tlinker.ld',
-    '-Wall'
-]
-
-cflags = ['-mcpu=cortex-m4',
-          '-mfpu=fpv4-sp-d16',
-          '-mfloat-abi=hard',
-]
-
-ldflags = [
     '-mcpu=cortex-m4',
     '-mfpu=fpv4-sp-d16',
     '-mfloat-abi=hard',
+    '-specs=nano.specs',
+    '-Wl,--gc-sections',
+    '-static',
+    '-u _printf_float',
+    '-Wall',
+    '-lc',
+    '-lm',
+    '-lnosys', 
+    '-Wl,-Map="{}",--cref'.format(MAPFILE),
+    '-T"{}"'.format(LDSCRIPT),
 ]
+
+cflags += DEFS
+ldflags += DEFS
+
 env = Environment(
     CCFLAGS = cflags,
+    ASFLAGS = cflags,
     LINKFLAGS = ldflags,
     CPPPATH = all_incs,
 )
@@ -89,9 +107,37 @@ srcs = {
         'swap_scratch.c',
         'tlv.c'
         ],
-    'boot/stm32/blackpill': [
+    'boot/stm32/nucleo-g431kb': [
         'mcuboot_main.c'
-        ]
+        ],
+    'boot/stm32/nucleo-g431kb/hal/Core/Src': [
+        'main.c',
+        'stm32g4xx_it.c',
+        'stm32g4xx_hal_msp.c',
+        'system_stm32g4xx.c',
+        ],
+    'boot/stm32/nucleo-g431kb/hal': [
+        'startup_stm32g431xx.S',
+        ],        
+    'boot/stm32/nucleo-g431kb/hal/Drivers/STM32G4xx_HAL_Driver/Src': [
+        'stm32g4xx_hal_tim.c',
+        'stm32g4xx_hal_tim_ex.c',
+        'stm32g4xx_hal_pwr_ex.c',
+        'stm32g4xx_hal_uart.c',
+        'stm32g4xx_hal_uart_ex.c',
+        'stm32g4xx_hal.c',
+        'stm32g4xx_hal_rcc.c',
+        'stm32g4xx_hal_rcc_ex.c',
+        'stm32g4xx_hal_flash.c',
+        'stm32g4xx_hal_flash_ex.c',
+        'stm32g4xx_hal_flash_ramfunc.c',
+        'stm32g4xx_hal_gpio.c',
+        'stm32g4xx_hal_exti.c',
+        'stm32g4xx_hal_dma.c',
+        'stm32g4xx_hal_dma_ex.c',
+        'stm32g4xx_hal_pwr.c',
+        'stm32g4xx_hal_cortex.c',
+        ],        
     }
 
 all_srcs = []
@@ -116,7 +162,7 @@ def arm_generator(source, target, env, for_signature):
 
 #for app_name,app_src in srcs.items():
 #    s = fixed_srcs + [ os.path.join(srcs_dir,f) for f in app_src ]
-prg = env.Program(target='mcuboot_stm32',source=all_srcs)
+prg = env.Program(target=TARGET+'.elf',source=all_srcs)
 #env.Objdump(prg)
 
 
