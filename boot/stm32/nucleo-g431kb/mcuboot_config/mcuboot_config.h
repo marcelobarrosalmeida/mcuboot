@@ -97,7 +97,8 @@
 
 /*
 NUCLEO-G431KB: STM32G431KB 128kB, single bank, 2kB per sector
-32kB: 0x08000000-0x08007FFF  bootloader
+28kB: 0x08000000-0x08006FFF  bootloader
+04kB: 0x08070000-0x08007FFF  scratch area
 48kB: 0x08008000-0x08013FFF  first image
 48kB: 0x08014000-0x0801FFFF  second image
 */
