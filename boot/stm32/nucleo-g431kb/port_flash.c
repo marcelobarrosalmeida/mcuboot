@@ -1,8 +1,11 @@
+#include <stdint.h>
 
 #include "mcuboot_config/mcuboot_logging.h"
 #include "flash_map_backend/flash_map_backend.h"
 #include "sysflash/sysflash.h"
 #include "bootutil/bootutil.h"
+
+#include "stm32g4xx_hal.h"
 
 /*
 NUCLEO-G431KB: STM32G431KB 128kB, single bank, 2kB per sector
@@ -85,7 +88,189 @@ void flash_area_close(const struct flash_area *area)
 
 }
 
+static void port_flash_unlock(void)
+{
+	if(READ_BIT(FLASH->CR, FLASH_CR_LOCK))
+	{
+		WRITE_REG(FLASH->KEYR, FLASH_KEY1);
+		WRITE_REG(FLASH->KEYR, FLASH_KEY2);
+	}
+}
+
+static void port_flash_lock(void)
+{
+	SET_BIT(FLASH->CR, FLASH_CR_LOCK);
+}
+
+static void port_flash_cache_disable(void)
+{
+	reactivate_icache = false;
+	reactivate_dcache = false;
+
+	if(READ_BIT(FLASH->ACR, FLASH_ACR_ICEN))
+	{
+		LL_FLASH_DisableInstCache();
+		reactivate_icache = true;
+	}
+
+	if(READ_BIT(FLASH->ACR, FLASH_ACR_DCEN))
+	{
+		LL_FLASH_DisableDataCache();
+		reactivate_dcache = true;
+	}
+}
+
+static void port_flash_cache_restore(void)
+{
+
+	if(reactivate_icache)
+	{
+		LL_FLASH_EnableInstCacheReset();
+		LL_FLASH_EnableInstCache();
+	}
+
+	if(reactivate_dcache)
+	{
+		LL_FLASH_EnableDataCacheReset();
+		LL_FLASH_EnableDataCache();
+	}
+}
+
+static void port_flash_operation_wait(void)
+{
+	while(READ_BIT(FLASH->SR, FLASH_SR_BSY))
+	{}
+}
+
+static void port_flash_check_errors(void)
+{
+	if(READ_BIT(FLASH->SR, FLASH_SR_PROGERR))
+				SET_BIT(FLASH->SR, FLASH_SR_PROGERR);
+
+	if(READ_BIT(FLASH->SR, FLASH_SR_WRPERR))
+			SET_BIT(FLASH->SR, FLASH_SR_WRPERR);
+
+	if(READ_BIT(FLASH->SR, FLASH_SR_PGAERR))
+			SET_BIT(FLASH->SR, FLASH_SR_PGAERR);
+
+	if(READ_BIT(FLASH->SR, FLASH_SR_SIZERR))
+			SET_BIT(FLASH->SR, FLASH_SR_SIZERR);
+
+	if(READ_BIT(FLASH->SR, FLASH_SR_PGSERR))
+			SET_BIT(FLASH->SR, FLASH_SR_PGSERR);
+
+	if(READ_BIT(FLASH->SR, FLASH_SR_MISERR))
+			SET_BIT(FLASH->SR, FLASH_SR_MISERR);
+
+	if(READ_BIT(FLASH->SR, FLASH_SR_FASTERR))
+			SET_BIT(FLASH->SR, FLASH_SR_FASTERR);
+}
+
+static bool port_flash_sector_erase(ulora_fls_sector_t sec)
+{
+	uint32_t page_index = sector_page[sec];
+
+	port_flash_unlock();
+	port_flash_cache_disable();
+
+	port_flash_operation_wait();
+	port_flash_check_errors();
+
+	MODIFY_REG(FLASH->CR, FLASH_CR_PNB, ((page_index & 0xFFU) << FLASH_CR_PNB_Pos));
+	SET_BIT(FLASH->CR, FLASH_CR_PER);
+	SET_BIT(FLASH->CR, FLASH_CR_STRT);
+
+	port_flash_operation_wait();
+
+	CLEAR_BIT(FLASH->CR, (FLASH_CR_PER | FLASH_CR_PNB));
+
+	port_flash_cache_restore();
+	port_flash_lock();
+
+	return true;
+}
+
+static void port_flash_data_write(ulora_fls_sector_t sec, uint16_t index, uint64_t data)
+{
+	uint32_t addr = sector_address[sec] + index*sizeof(uint64_t);
+
+	port_flash_unlock();
+	port_flash_cache_disable();
+
+	// Check that no Flash main memory operation is ongoing by checking the BSY bit in the Flash status register (FLASH_SR).
+	port_flash_operation_wait();
+
+	// Check and clear all error programming flags due to a previous programming. If not, PGSERR is set.
+	port_flash_check_errors();
+
+	//  Set the PG bit in the Flash control register (FLASH_CR)
+	SET_BIT(FLASH->CR, FLASH_CR_PG);
+
+	// Write a first word in an address aligned with double word
+	// Write the second word
+
+	*(__IO uint32_t*)addr = (uint32_t)data;
+	/* Barrier to ensure programming is performed in 2 steps, in right order
+	    (independently of compiler optimization behavior) */
+	__ISB();
+
+	/* Program second word */
+	*(__IO uint32_t*)(addr+4U) = (uint32_t)(data >> 32);
+
+	 // Wait until the BSY bit is cleared in the FLASH_SR register
+	 port_flash_operation_wait();
+
+	 // Check that EOP flag is set in the FLASH_SR register (meaning that the programming operation has succeed), and clear it by software.
+	 // (somente se tem interrupcao)
+
+	 // Clear the PG bit in the FLASH_CR register if there no more programming request anymore.
+	 CLEAR_BIT(FLASH->CR, FLASH_CR_PG);
+
+	 port_flash_cache_restore();
+	 port_flash_lock();
+}
+
+static uint64_t port_flash_data_read(ulora_fls_sector_t sec, uint16_t index)
+{
+	uint32_t addr = sector_address[sec] + index*sizeof(uint64_t);
+
+	return *((uint64_t *)addr);
+}
+
 #if 0
+int flash_area_read(const struct flash_area *fa, uint32_t off, void *dst,
+                    uint32_t len)
+{
+    uint64_t internal_data = 0, read_len = 0;
+    void *read_ptr;
+    if (fa->fa_device_id != FLASH_DEVICE_INTERNAL_FLASH) 
+    {
+        return -1;
+    }
+
+    const uint32_t end_offset = off + len;
+
+    if (end_offset > fa->fa_size) 
+    {
+        MCUBOOT_LOG_ERR("%s: Out of Bounds (0x%x vs 0x%x)", __func__, end_offset, fa->fa_size);
+        return -1;
+    }
+
+    read_len = (len < 8) ? sizeof(uint64_t) : len;
+    read_ptr = (len < 8) ? (void *)&internal_data : dst;
+    
+    if (bootloader_flash_read(fa->fa_off + off, read_ptr, read_len, true) != ESP_OK) 
+    {
+        MCUBOOT_LOG_ERR("%s: Flash read failed", __func__);
+        return -1;
+    }
+    if (len < 4) {
+        memcpy(dst, read_ptr, len);
+    }
+    return 0;
+}
+
+
 int flash_area_read(const struct flash_area *fa, uint32_t off, void *dst,
                     uint32_t len)
 {

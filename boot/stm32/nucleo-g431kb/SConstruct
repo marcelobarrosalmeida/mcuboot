@@ -11,7 +11,7 @@ all_incs = [
     os.path.join(mcuboot_root,'boot/bootutil'),
     os.path.join(mcuboot_root,'boot/stm32/nucleo-g431kb/hal/Core/Inc'),
     os.path.join(mcuboot_root,'boot/stm32/nucleo-g431kb/hal/Drivers/STM32G4xx_HAL_Driver/Inc'),
-    os.path.join(mcuboot_root,'boot/stm32/nucleo-g431kb/hal/Drivers/STM32G4xx_HAL_Driver/Inc/Legacy'),
+#    os.path.join(mcuboot_root,'boot/stm32/nucleo-g431kb/hal/Drivers/STM32G4xx_HAL_Driver/Inc/Legacy'),
     os.path.join(mcuboot_root,'boot/stm32/nucleo-g431kb/hal/Drivers/CMSIS/Include'),
     os.path.join(mcuboot_root,'boot/stm32/nucleo-g431kb/hal/Drivers/CMSIS/Device/ST/STM32G4xx/Include'),
     ]
@@ -31,8 +31,19 @@ tools = [
 ]
 
 DEFS = [    
-    '-DUSE_HAL_DRIVER',
     '-DSTM32G431xx',
+    '-DUSE_FULL_LL_DRIVER',
+    '-DHSE_VALUE=8000000',
+    '-DHSE_STARTUP_TIMEOUT=100',
+    '-DLSE_STARTUP_TIMEOUT=5000',
+    '-DLSE_VALUE=32768',
+    '-DEXTERNAL_CLOCK_VALUE=12288000',
+    '-DHSI_VALUE=16000000',
+    '-DLSI_VALUE=32000',
+    '-DVDD_VALUE=3300',
+    '-DPREFETCH_ENABLE=0',
+    '-DINSTRUCTION_CACHE_ENABLE=1',
+    '-DDATA_CACHE_ENABLE=1',
 ]
 LDSCRIPT = os.path.join(mcuboot_root,'boot/stm32/nucleo-g431kb/hal/','STM32G431KBTx_FLASH.ld')
 MAPFILE = os.path.join(mcuboot_root,'boot/stm32/nucleo-g431kb/hal/',TARGET+'.map')
@@ -109,35 +120,27 @@ srcs = {
         'tlv.c'
         ],
     'boot/stm32/nucleo-g431kb': [
-        'mcuboot_main.c'
-        ],
-    'boot/stm32/nucleo-g431kb/hal/Core/Src': [
-        'main.c',
-        'stm32g4xx_it.c',
-        'stm32g4xx_hal_msp.c',
-        'system_stm32g4xx.c',
+        'mcuboot_main.c',
+        'port_flash.c',
         ],
     'boot/stm32/nucleo-g431kb/hal': [
         'startup_stm32g431xx.S',
-        ],        
+        ], 
+    'boot/stm32/nucleo-g431kb/hal/Core/Src': [
+        'main.c',
+        'stm32g4xx_it.c',
+        'system_stm32g4xx.c',
+        'gpio.c',
+        'usart.c',
+        ],      
     'boot/stm32/nucleo-g431kb/hal/Drivers/STM32G4xx_HAL_Driver/Src': [
-        'stm32g4xx_hal_tim.c',
-        'stm32g4xx_hal_tim_ex.c',
-        'stm32g4xx_hal_pwr_ex.c',
-        'stm32g4xx_hal_uart.c',
-        'stm32g4xx_hal_uart_ex.c',
-        'stm32g4xx_hal.c',
-        'stm32g4xx_hal_rcc.c',
-        'stm32g4xx_hal_rcc_ex.c',
-        'stm32g4xx_hal_flash.c',
-        'stm32g4xx_hal_flash_ex.c',
-        'stm32g4xx_hal_flash_ramfunc.c',
-        'stm32g4xx_hal_gpio.c',
-        'stm32g4xx_hal_exti.c',
-        'stm32g4xx_hal_dma.c',
-        'stm32g4xx_hal_dma_ex.c',
-        'stm32g4xx_hal_pwr.c',
-        'stm32g4xx_hal_cortex.c',
+        'stm32g4xx_ll_utils.c',
+        'stm32g4xx_ll_exti.c',
+        'stm32g4xx_ll_gpio.c',
+        'stm32g4xx_ll_pwr.c',
+        'stm32g4xx_ll_usart.c',
+        'stm32g4xx_ll_rcc.c',
+        'stm32g4xx_ll_dma.c',
         ],        
     }
 
